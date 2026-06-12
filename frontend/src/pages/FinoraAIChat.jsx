@@ -1,8 +1,14 @@
 import { useState, useRef, useEffect } from "react";
 
 export default function FinoraAIChat() {
-  const API_URL = "http://localhost:5000/api/chat";
+  // const API_URL = "http://localhost:5000/api/chat";
 
+
+
+  const API_URL = `${import.meta.env.VITE_BACKEND_URL}/api/chat`;
+
+
+  
   const [messages, setMessages] = useState([
     {
       role: "assistant",

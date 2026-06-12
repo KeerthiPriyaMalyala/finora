@@ -749,8 +749,11 @@ const predictCategory = async (text) => {
 
   try {
 
-    const response = await fetch(
-      "http://localhost:8000/predict",
+    // const response = await fetch(
+    //   "http://localhost:8000/predict",
+
+     const response = await fetch(
+      `${import.meta.env.VITE_ML_URL}/predict`,
       {
         method: "POST",
         headers: {
