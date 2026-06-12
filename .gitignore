@@ -1,0 +1,7 @@
+
+.env
+backend/.env
+ml/.env
+*.pkl
+node_modules
+__pycache__
