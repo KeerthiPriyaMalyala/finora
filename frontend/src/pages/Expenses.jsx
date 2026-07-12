@@ -979,37 +979,69 @@ const handleDescriptionChange = async (e) => {
   //ne wadd
 
 
-  const exportToPDF = () => {
-  const doc = new jsPDF();
+  const handleExportPDF = useCallback(() => {
+  if (!transactions || transactions.length === 0) {
+    push("No transactions to export!", "error"); // Uses your hook toast
+    return;
+  }
 
-  doc.setFontSize(18);
-  doc.text("Expense Report", 14, 20);
+  try {
+    const doc = new jsPDF();
+    
+    // 1. Add PDF Document Title & Metadata
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(20);
+    doc.setTextColor(8, 11, 20); // Your page dark color #080B14
+    doc.text("Expense Tracker - Financial Report", 14, 20);
+    
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(10);
+    doc.setTextColor(100, 116, 139); // Slate muted color
+    doc.text(`Generated on: ${new Date().toLocaleDateString("en-IN")}`, 14, 27);
 
-  doc.setFontSize(11);
-  doc.text(`Generated: ${new Date().toLocaleString()}`, 14, 28);
+    // 2. Map data specifically matching your state structure
+    const tableRows = transactions.map((t) => [
+      t.date ? new Date(t.date).toLocaleDateString("en-IN") : "—",
+      t.description || t.category,
+      t.category,
+      t.paymentMethod,
+      t.transactionType === "income" ? "Income" : "Expense",
+      `${t.transactionType === "income" ? "+" : "-"} Rs. ${Number(t.amount || 0).toLocaleString("en-IN")}`
+    ]);
 
-  autoTable(doc, {
-    startY: 35,
-    head: [[
-      "Date",
-      "Category",
-      "Description",
-      "Payment",
-      "Type",
-      "Amount"
-    ]],
-    body: processed.map((item) => [
-      new Date(item.date).toLocaleDateString("en-IN"),
-      item.category,
-      item.description || "-",
-      item.paymentMethod,
-      item.transactionType,
-      `fmt{item.amount}`
-    ]),
-  });
+    // 3. Generate Table using autoTable
+    autoTable(doc, {
+      startY: 35,
+      head: [["Date", "Description", "Category", "Payment Method", "Type", "Amount"]],
+      body: tableRows,
+      theme: "striped",
+      headStyles: {
+        fillColor: [45, 212, 191], // Matches your teal #2dd4bf brand accent
+        textColor: [255, 255, 255],
+        fontStyle: "bold"
+      },
+      alternateRowStyles: {
+        fillColor: [248, 250, 252]
+      },
+      styles: {
+        font: "helvetica",
+        fontSize: 9,
+        cellPadding: 4
+      },
+      columnStyles: {
+        5: { halign: "right", fontStyle: "bold" } // Align amount column nicely
+      }
+    });
 
-  doc.save("expenses.pdf");
-};
+    // 4. Trigger download
+    doc.save(`Financial_Report_${new Date().toISOString().split('T')[0]}.pdf`);
+    push("Report downloaded successfully!", "success");
+
+  } catch (error) {
+    console.error("PDF generation failed:", error);
+    push("Failed to generate PDF.", "error");
+  }
+}, [transactions, push]);
 
   /* ══════════════════════════════════
      RENDER
@@ -1087,16 +1119,11 @@ const handleDescriptionChange = async (e) => {
           )}
           {/* Export button — UI only */}
           <button
-  onClick={exportToPDF}
-  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold"
-  style={{
-    background: "rgba(255,255,255,0.06)",
-    border: "1px solid rgba(255,255,255,0.1)",
-    color: "white"
-  }}
+  onClick={handleExportPDF}
+  className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white/[0.07] border border-white/[0.12] text-white/80 text-sm font-semibold hover:bg-white/[0.12] transition-all duration-200"
+  title="Export as PDF"
 >
-  <Download size={13} />
-  Export PDF
+  <Download size={16} /> Export PDF
 </button>
           {/* Add button (toggles form) */}
           <button
