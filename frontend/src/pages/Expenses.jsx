@@ -1301,6 +1301,8 @@
 
 
 
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
 
 import { useEffect, useState, useCallback } from "react";
 import {
@@ -2267,6 +2269,47 @@ const handleDescriptionChange = async (e) => {
     filters.category, filters.transactionType, filters.startDate, filters.endDate,
   ].filter(Boolean).length;
 
+
+
+
+
+
+
+  //ne wadd
+
+
+  const exportToPDF = () => {
+  const doc = new jsPDF();
+
+  doc.setFontSize(18);
+  doc.text("Expense Report", 14, 20);
+
+  doc.setFontSize(11);
+  doc.text(`Generated: ${new Date().toLocaleString()}`, 14, 28);
+
+  autoTable(doc, {
+    startY: 35,
+    head: [[
+      "Date",
+      "Category",
+      "Description",
+      "Payment",
+      "Type",
+      "Amount"
+    ]],
+    body: processed.map((item) => [
+      new Date(item.date).toLocaleDateString("en-IN"),
+      item.category,
+      item.description || "-",
+      item.paymentMethod,
+      item.transactionType,
+      `₹${item.amount}`
+    ]),
+  });
+
+  doc.save("expenses.pdf");
+};
+
   /* ══════════════════════════════════
      RENDER
   ══════════════════════════════════ */
@@ -2343,12 +2386,17 @@ const handleDescriptionChange = async (e) => {
           )}
           {/* Export button — UI only */}
           <button
-            disabled
-            title="Export (coming soon)"
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold opacity-40 cursor-not-allowed"
-            style={{ background:"rgba(255,255,255,0.06)", border:"1px solid rgba(255,255,255,0.1)", color:"rgba(255,255,255,0.5)" }}>
-            <Download size={13} /> Export
-          </button>
+  onClick={exportToPDF}
+  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold"
+  style={{
+    background: "rgba(255,255,255,0.06)",
+    border: "1px solid rgba(255,255,255,0.1)",
+    color: "white"
+  }}
+>
+  <Download size={13} />
+  Export PDF
+</button>
           {/* Add button (toggles form) */}
           <button
             onClick={() => setShowForm((p) => !p)}
