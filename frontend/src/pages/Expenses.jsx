@@ -1,7 +1,3 @@
-
-
-
-
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 
@@ -14,67 +10,57 @@ import {
 
 import api from "../api/axios";
 
-
-
-
-
 /* ══════════════════════════════════════════════════
    CONSTANTS
 ══════════════════════════════════════════════════ */
 const CATEGORIES = [
-  "Food","Travel","Bills","Shopping","Entertainment",
-  "Health","Education","Salary","Investment","Others","Grocery",
-          "Fitness",
-          "Transport",
-          "Rent",
+  "Food", "Travel", "Bills", "Shopping", "Entertainment",
+  "Health", "Education", "Salary", "Investment", "Others", "Grocery",
+  "Fitness", "Transport", "Rent",
 ];
 
 const CATEGORY_EMOJI = {
-  Food:"🍔", Travel:"✈️", Bills:"📋", Shopping:"🛍️",
-  Entertainment:"🎬", Health:"💊", Education:"📚",
-  Salary:"💼", Investment:"📈", Others:"📦",Grocery:"🛒",
-Fitness:"🏋️",
-Transport:"🚌",
-Rent:"🏠",
+  Food: "🍔", Travel: "✈️", Bills: "📋", Shopping: "🛍️",
+  Entertainment: "🎬", Health: "💊", Education: "📚",
+  Salary: "💼", Investment: "📈", Others: "📦", Grocery: "🛒",
+  Fitness: "🏋️", Transport: "🚌", Rent: "🏠",
 };
 
 const CATEGORY_COLOR = {
-  Food:"#fb923c", Travel:"#60a5fa", Bills:"#c084fc",
-  Shopping:"#f472b6", Entertainment:"#fbbf24", Health:"#f87171",
-  Education:"#22d3ee", Salary:"#4ade80", Investment:"#5eead4",
-  Others:"#94a3b8",Grocery:"#34d399",
-Fitness:"#f43f5e",
-Transport:"#38bdf8",
-Rent:"#facc15",
+  Food: "#fb923c", Travel: "#60a5fa", Bills: "#c084fc",
+  Shopping: "#f472b6", Entertainment: "#fbbf24", Health: "#f87171",
+  Education: "#22d3ee", Salary: "#4ade80", Investment: "#5eead4",
+  Others: "#94a3b8", Grocery: "#34d399",
+  Fitness: "#f43f5e", Transport: "#38bdf8", Rent: "#facc15",
 };
 
 const PAYMENT_METHODS = [
-  "Cash","UPI","Credit Card","Debit Card","Bank Transfer","Wallet",
+  "Cash", "UPI", "Credit Card", "Debit Card", "Bank Transfer", "Wallet",
 ];
 
 const PAYMENT_ICONS = {
-  Cash:"💵", UPI:"📱", "Credit Card":"💳", "Debit Card":"🏦",
-  "Bank Transfer":"🔁", Wallet:"👛",
+  Cash: "💵", UPI: "📱", "Credit Card": "💳", "Debit Card": "🏦",
+  "Bank Transfer": "🔁", Wallet: "👛",
 };
 
 const PAYMENT_COLOR = {
-  Cash:"#4ade80", UPI:"#60a5fa", "Credit Card":"#f472b6",
-  "Debit Card":"#fb923c", "Bank Transfer":"#c084fc", Wallet:"#fbbf24",
+  Cash: "#4ade80", UPI: "#60a5fa", "Credit Card": "#f472b6",
+  "Debit Card": "#fb923c", "Bank Transfer": "#c084fc", Wallet: "#fbbf24",
 };
 
 const SORT_OPTIONS = [
-  { value:"latest",  label:"Latest"  },
-  { value:"oldest",  label:"Oldest"  },
-  { value:"highest", label:"Highest" },
-  { value:"lowest",  label:"Lowest"  },
+  { value: "latest",  label: "Latest"  },
+  { value: "oldest",  label: "Oldest"  },
+  { value: "highest", label: "Highest" },
+  { value: "lowest",  label: "Lowest"  },
 ];
 
 const todayStr = new Date().toISOString().split("T")[0];
 
 const emptyForm = {
-  amount:"", category:"Food", description:"",
-  paymentMethod:"Cash", transactionType:"expense",
-  date:todayStr, tags:"", recurring:false,
+  amount: "", category: "Food", description: "",
+  paymentMethod: "Cash", transactionType: "expense",
+  date: todayStr, tags: "", recurring: false,
 };
 
 const PAGE_BG   = "linear-gradient(135deg,#080B14 0%,#0c1420 50%,#080B14 100%)";
@@ -94,7 +80,7 @@ function getDateGroup(dateStr) {
   if (!dateStr) return "Earlier";
   const d    = new Date(dateStr);
   const now  = new Date();
-  const diff = Math.floor((now.setHours(0,0,0,0) - d.setHours(0,0,0,0)) / 86400000);
+  const diff = Math.floor((now.setHours(0, 0, 0, 0) - d.setHours(0, 0, 0, 0)) / 86400000);
   if (diff === 0) return "Today";
   if (diff === 1) return "Yesterday";
   if (diff <= 6)  return "This Week";
@@ -102,7 +88,7 @@ function getDateGroup(dateStr) {
 }
 
 function groupByDate(transactions) {
-  const order  = ["Today","Yesterday","This Week","Earlier"];
+  const order  = ["Today", "Yesterday", "This Week", "Earlier"];
   const groups = {};
   order.forEach((g) => { groups[g] = []; });
   transactions.forEach((t) => {
@@ -110,6 +96,29 @@ function groupByDate(transactions) {
     groups[g].push(t);
   });
   return order.filter((g) => groups[g].length > 0).map((g) => ({ label: g, items: groups[g] }));
+}
+
+/* ══════════════════════════════════════════════════
+   SHARED AI PREDICTION HELPER
+   (used by both Add form and Edit modal)
+══════════════════════════════════════════════════ */
+async function predictCategory(text) {
+  try {
+    const response = await fetch(
+      `${import.meta.env.VITE_ML_URL}/predict`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text }),
+      }
+    );
+    if (!response.ok) return "";
+    const data = await response.json();
+    return data.category || "";
+  } catch (err) {
+    console.log("Prediction Error:", err);
+    return "";
+  }
 }
 
 /* ══════════════════════════════════════════════════
@@ -126,11 +135,11 @@ function useToast() {
 }
 
 function ToastContainer({ toasts }) {
-  const icons  = { success:<CheckCircle size={15}/>, error:<AlertCircle size={15}/>, info:<Info size={15}/> };
+  const icons  = { success: <CheckCircle size={15} />, error: <AlertCircle size={15} />, info: <Info size={15} /> };
   const colors = {
-    success:{ bg:"rgba(34,197,94,0.12)",  border:"rgba(34,197,94,0.3)",  text:"#4ade80" },
-    error:  { bg:"rgba(239,68,68,0.12)",  border:"rgba(239,68,68,0.3)",  text:"#f87171" },
-    info:   { bg:"rgba(45,212,191,0.12)", border:"rgba(45,212,191,0.3)", text:"#5eead4" },
+    success: { bg: "rgba(34,197,94,0.12)",  border: "rgba(34,197,94,0.3)",  text: "#4ade80" },
+    error:   { bg: "rgba(239,68,68,0.12)",  border: "rgba(239,68,68,0.3)",  text: "#f87171" },
+    info:    { bg: "rgba(45,212,191,0.12)", border: "rgba(45,212,191,0.3)", text: "#5eead4" },
   };
   return (
     <div className="fixed top-5 right-5 z-[60] flex flex-col gap-2 pointer-events-none">
@@ -139,9 +148,9 @@ function ToastContainer({ toasts }) {
         return (
           <div key={t.id}
             className="flex items-center gap-2.5 px-4 py-3 rounded-xl text-sm font-medium pointer-events-auto"
-            style={{ background:c.bg, border:`1px solid ${c.border}`, color:c.text,
-              backdropFilter:"blur(20px)", boxShadow:"0 8px 32px rgba(0,0,0,0.35)",
-              animation:"toastIn .25s ease both" }}
+            style={{ background: c.bg, border: `1px solid ${c.border}`, color: c.text,
+              backdropFilter: "blur(20px)", boxShadow: "0 8px 32px rgba(0,0,0,0.35)",
+              animation: "toastIn .25s ease both" }}
           >
             {icons[t.type]}{t.msg}
           </div>
@@ -157,7 +166,7 @@ function ToastContainer({ toasts }) {
 function SkeletonCard({ delay = 0 }) {
   return (
     <div className="flex items-center gap-4 p-4 rounded-2xl"
-      style={{ background:"rgba(255,255,255,0.025)", border:"1px solid rgba(255,255,255,0.06)", animation:`fadeUp .4s ${delay}s ease both` }}>
+      style={{ background: "rgba(255,255,255,0.025)", border: "1px solid rgba(255,255,255,0.06)", animation: `fadeUp .4s ${delay}s ease both` }}>
       <div className="w-12 h-12 rounded-xl shrink-0 shimmer-box" />
       <div className="flex-1 space-y-2">
         <div className="h-3.5 rounded-full w-1/3 shimmer-box" />
@@ -193,11 +202,11 @@ function QuickStats({ transactions }) {
   const average      = transactions.length ? transactions.reduce((s, t) => s + (t.amount || 0), 0) / transactions.length : 0;
 
   const stats = [
-    { label:"Transactions", value:transactions.length,   icon:Hash,       color:"#5eead4", suffix:"" },
-    { label:"Total Expense", value:fmt(totalExpense),    icon:TrendingDown, color:"#f87171", suffix:"" },
-    { label:"Total Income",  value:fmt(totalIncome),     icon:TrendingUp,   color:"#4ade80", suffix:"" },
-    { label:"Highest",       value:fmt(highest),         icon:Zap,          color:"#fbbf24", suffix:"" },
-    { label:"Average",       value:fmt(Math.round(average)), icon:BarChart2, color:"#c084fc", suffix:"" },
+    { label: "Transactions", value: transactions.length,       icon: Hash,        color: "#5eead4" },
+    { label: "Total Expense", value: fmt(totalExpense),        icon: TrendingDown, color: "#f87171" },
+    { label: "Total Income",  value: fmt(totalIncome),         icon: TrendingUp,   color: "#4ade80" },
+    { label: "Highest",       value: fmt(highest),             icon: Zap,          color: "#fbbf24" },
+    { label: "Average",       value: fmt(Math.round(average)), icon: BarChart2,    color: "#c084fc" },
   ];
 
   return (
@@ -205,18 +214,18 @@ function QuickStats({ transactions }) {
       {stats.map((s) => (
         <div key={s.label}
           className="stat-card rounded-2xl p-3.5 flex flex-col gap-2"
-          style={{ background:`${s.color}08`, border:`1px solid ${s.color}20` }}
+          style={{ background: `${s.color}08`, border: `1px solid ${s.color}20` }}
         >
           <div className="flex items-center justify-between">
-            <span className="text-[10px] font-bold uppercase tracking-widest" style={{ color:"rgba(255,255,255,0.35)" }}>{s.label}</span>
+            <span className="text-[10px] font-bold uppercase tracking-widest" style={{ color: "rgba(255,255,255,0.35)" }}>{s.label}</span>
             <div className="w-6 h-6 rounded-lg flex items-center justify-center"
-              style={{ background:`${s.color}18`, boxShadow:`0 0 8px ${s.color}30` }}>
-              <s.icon size={12} style={{ color:s.color }} />
+              style={{ background: `${s.color}18`, boxShadow: `0 0 8px ${s.color}30` }}>
+              <s.icon size={12} style={{ color: s.color }} />
             </div>
           </div>
           <p className="text-base font-bold leading-none" style={{
-            background:`linear-gradient(90deg,${s.color},${s.color}aa)`,
-            WebkitBackgroundClip:"text", WebkitTextFillColor:"transparent" }}>
+            background: `linear-gradient(90deg,${s.color},${s.color}aa)`,
+            WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>
             {s.value}
           </p>
         </div>
@@ -232,7 +241,7 @@ function PaymentAnalytics({ transactions }) {
   const stats = PAYMENT_METHODS.map((m) => {
     const txs   = transactions.filter((t) => t.paymentMethod === m);
     const total = txs.reduce((s, t) => s + (t.amount || 0), 0);
-    return { method:m, count:txs.length, total };
+    return { method: m, count: txs.length, total };
   }).filter((s) => s.count > 0);
 
   if (!stats.length) return null;
@@ -247,7 +256,7 @@ function PaymentAnalytics({ transactions }) {
             <BarChart2 size={13} className="text-amber-300" />
           </div>
           <h3 className="text-sm font-bold uppercase tracking-widest"
-            style={{ background:"linear-gradient(90deg,#fbbf24,#5eead4)", WebkitBackgroundClip:"text", WebkitTextFillColor:"transparent" }}>
+            style={{ background: "linear-gradient(90deg,#fbbf24,#5eead4)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>
             Payment Method Breakdown
           </h3>
         </div>
@@ -256,11 +265,11 @@ function PaymentAnalytics({ transactions }) {
             const color = PAYMENT_COLOR[s.method] || "#5eead4";
             return (
               <div key={s.method} className="pm-card rounded-xl p-3 flex flex-col gap-1.5 cursor-default"
-                style={{ background:`${color}08`, border:`1px solid ${color}20` }}>
+                style={{ background: `${color}08`, border: `1px solid ${color}20` }}>
                 <div className="text-xl">{PAYMENT_ICONS[s.method]}</div>
-                <p className="text-[11px] font-bold" style={{ color:"rgba(255,255,255,0.6)" }}>{s.method}</p>
+                <p className="text-[11px] font-bold" style={{ color: "rgba(255,255,255,0.6)" }}>{s.method}</p>
                 <p className="text-sm font-bold" style={{ color }}>{fmt(s.total)}</p>
-                <p className="text-[10px]" style={{ color:"rgba(255,255,255,0.3)" }}>{s.count} txn{s.count !== 1 ? "s" : ""}</p>
+                <p className="text-[10px]" style={{ color: "rgba(255,255,255,0.3)" }}>{s.count} txn{s.count !== 1 ? "s" : ""}</p>
               </div>
             );
           })}
@@ -271,7 +280,7 @@ function PaymentAnalytics({ transactions }) {
 }
 
 /* ══════════════════════════════════════════════════
-   TRANSACTION CARD (inline, upgraded)
+   TRANSACTION CARD
 ══════════════════════════════════════════════════ */
 function TransactionCard({ expense, onEdit, onDelete, onClick }) {
   const isIncome = expense.transactionType === "income";
@@ -281,14 +290,13 @@ function TransactionCard({ expense, onEdit, onDelete, onClick }) {
   return (
     <div
       className="tx-card group flex items-center gap-4 p-4 rounded-2xl cursor-pointer transition-all duration-200"
-      style={{ background:"rgba(255,255,255,0.025)", border:"1px solid rgba(255,255,255,0.06)" }}
+      style={{ background: "rgba(255,255,255,0.025)", border: "1px solid rgba(255,255,255,0.06)" }}
       onClick={() => onClick(expense)}
     >
       {/* Category icon */}
       <div className="w-12 h-12 rounded-xl shrink-0 flex items-center justify-center text-xl font-bold relative"
-        style={{ background:`${catColor}18`, border:`1px solid ${catColor}28`, boxShadow:`0 0 14px ${catColor}18` }}>
+        style={{ background: `${catColor}18`, border: `1px solid ${catColor}28`, boxShadow: `0 0 14px ${catColor}18` }}>
         {CATEGORY_EMOJI[expense.category] || "📦"}
-        {/* Income/Expense dot */}
         <span className="absolute -top-1 -right-1 w-3.5 h-3.5 rounded-full border-2 border-[#080B14] flex items-center justify-center"
           style={{ background: isIncome ? "#4ade80" : "#f87171" }}>
           <span className="text-[7px] font-black text-black">{isIncome ? "+" : "-"}</span>
@@ -303,8 +311,8 @@ function TransactionCard({ expense, onEdit, onDelete, onClick }) {
           </p>
           <span className="shrink-0 text-[10px] font-bold px-1.5 py-0.5 rounded-md"
             style={isIncome
-              ? { background:"rgba(74,222,128,0.12)", color:"#4ade80", border:"1px solid rgba(74,222,128,0.25)" }
-              : { background:"rgba(248,113,113,0.12)", color:"#f87171", border:"1px solid rgba(248,113,113,0.25)" }}>
+              ? { background: "rgba(74,222,128,0.12)", color: "#4ade80", border: "1px solid rgba(74,222,128,0.25)" }
+              : { background: "rgba(248,113,113,0.12)", color: "#f87171", border: "1px solid rgba(248,113,113,0.25)" }}>
             {isIncome ? "Income" : "Expense"}
           </span>
         </div>
@@ -321,7 +329,7 @@ function TransactionCard({ expense, onEdit, onDelete, onClick }) {
             <>
               <span className="text-[11px] text-white/25">·</span>
               <span className="text-[11px] text-white/30">
-                {new Date(expense.date).toLocaleDateString("en-IN", { day:"2-digit", month:"short" })}
+                {new Date(expense.date).toLocaleDateString("en-IN", { day: "2-digit", month: "short" })}
               </span>
             </>
           )}
@@ -329,7 +337,7 @@ function TransactionCard({ expense, onEdit, onDelete, onClick }) {
             <>
               <span className="text-[11px] text-white/25">·</span>
               <span className="text-[10px] px-1.5 py-0.5 rounded-md font-semibold"
-                style={{ background:"rgba(45,212,191,0.15)", color:"#5eead4", border:"1px solid rgba(45,212,191,0.25)" }}>
+                style={{ background: "rgba(45,212,191,0.15)", color: "#5eead4", border: "1px solid rgba(45,212,191,0.25)" }}>
                 🔁 Recurring
               </span>
             </>
@@ -341,13 +349,13 @@ function TransactionCard({ expense, onEdit, onDelete, onClick }) {
           <div className="flex gap-1.5 flex-wrap mt-1.5">
             {tags.slice(0, 3).map((tag, i) => (
               <span key={i} className="text-[10px] px-2 py-0.5 rounded-full font-medium"
-                style={{ background:"rgba(255,255,255,0.06)", color:"rgba(255,255,255,0.4)", border:"1px solid rgba(255,255,255,0.08)" }}>
+                style={{ background: "rgba(255,255,255,0.06)", color: "rgba(255,255,255,0.4)", border: "1px solid rgba(255,255,255,0.08)" }}>
                 #{tag}
               </span>
             ))}
             {tags.length > 3 && (
               <span className="text-[10px] px-2 py-0.5 rounded-full font-medium"
-                style={{ background:"rgba(255,255,255,0.04)", color:"rgba(255,255,255,0.25)" }}>
+                style={{ background: "rgba(255,255,255,0.04)", color: "rgba(255,255,255,0.25)" }}>
                 +{tags.length - 3}
               </span>
             )}
@@ -362,12 +370,11 @@ function TransactionCard({ expense, onEdit, onDelete, onClick }) {
             background: isIncome
               ? "linear-gradient(90deg,#4ade80,#86efac)"
               : "linear-gradient(90deg,#f87171,#fca5a5)",
-            WebkitBackgroundClip:"text", WebkitTextFillColor:"transparent",
+            WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent",
           }}>
           {isIncome ? "+" : "-"}{fmt(expense.amount)}
         </span>
 
-        {/* Action buttons — visible on hover */}
         <div className="flex gap-1.5 opacity-0 group-hover:opacity-100 transition-all duration-200">
           <button
             onClick={(e) => { e.stopPropagation(); onClick(expense); }}
@@ -400,10 +407,10 @@ function TransactionCard({ expense, onEdit, onDelete, onClick }) {
    TRANSACTION HISTORY (grouped)
 ══════════════════════════════════════════════════ */
 const GROUP_STYLE = {
-  Today:     { bg:"rgba(45,212,191,0.12)", border:"rgba(45,212,191,0.3)", text:"#5eead4",  dot:"#2dd4bf" },
-  Yesterday: { bg:"rgba(245,158,11,0.1)", border:"rgba(245,158,11,0.25)", text:"#fbbf24",  dot:"#f59e0b" },
-  "This Week":{ bg:"rgba(34,197,94,0.08)", border:"rgba(34,197,94,0.2)",  text:"#4ade80",  dot:"#22c55e" },
-  Earlier:   { bg:"rgba(255,255,255,0.05)", border:"rgba(255,255,255,0.1)", text:"rgba(255,255,255,0.45)", dot:"rgba(255,255,255,0.3)" },
+  Today:      { bg: "rgba(45,212,191,0.12)",  border: "rgba(45,212,191,0.3)",  text: "#5eead4",  dot: "#2dd4bf" },
+  Yesterday:  { bg: "rgba(245,158,11,0.1)",   border: "rgba(245,158,11,0.25)", text: "#fbbf24",  dot: "#f59e0b" },
+  "This Week":{ bg: "rgba(34,197,94,0.08)",   border: "rgba(34,197,94,0.2)",   text: "#4ade80",  dot: "#22c55e" },
+  Earlier:    { bg: "rgba(255,255,255,0.05)",  border: "rgba(255,255,255,0.1)", text: "rgba(255,255,255,0.45)", dot: "rgba(255,255,255,0.3)" },
 };
 
 function TransactionHistory({ groups, onEdit, onDelete, onView }) {
@@ -413,18 +420,15 @@ function TransactionHistory({ groups, onEdit, onDelete, onView }) {
         const gs = GROUP_STYLE[label] || GROUP_STYLE.Earlier;
         return (
           <div key={label}>
-            {/* Date group header */}
             <div className="flex items-center gap-3 mb-3">
               <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold uppercase tracking-widest"
-                style={{ background:gs.bg, border:`1px solid ${gs.border}`, color:gs.text }}>
-                <span className="w-1.5 h-1.5 rounded-full" style={{ background:gs.dot }} />
+                style={{ background: gs.bg, border: `1px solid ${gs.border}`, color: gs.text }}>
+                <span className="w-1.5 h-1.5 rounded-full" style={{ background: gs.dot }} />
                 {label}
                 <span className="ml-1 opacity-60">{items.length}</span>
               </span>
-              <div className="flex-1 h-px" style={{ background:`linear-gradient(90deg,${gs.border},transparent)` }} />
+              <div className="flex-1 h-px" style={{ background: `linear-gradient(90deg,${gs.border},transparent)` }} />
             </div>
-
-            {/* Cards */}
             <div className="space-y-2">
               {items.map((expense) => (
                 <TransactionCard
@@ -444,33 +448,31 @@ function TransactionHistory({ groups, onEdit, onDelete, onView }) {
 }
 
 /* ══════════════════════════════════════════════════
-   ADVANCED EMPTY STATE
+   EMPTY STATE
 ══════════════════════════════════════════════════ */
 function EmptyState({ onAddClick }) {
   return (
     <div className="flex flex-col items-center justify-center py-20 gap-6">
-      {/* Illustration */}
       <div className="relative w-32 h-32">
         <div className="absolute inset-0 rounded-3xl"
-          style={{ background:"rgba(45,212,191,0.1)", border:"1px solid rgba(45,212,191,0.2)", boxShadow:"0 0 40px rgba(45,212,191,0.12)" }} />
+          style={{ background: "rgba(45,212,191,0.1)", border: "1px solid rgba(45,212,191,0.2)", boxShadow: "0 0 40px rgba(45,212,191,0.12)" }} />
         <div className="absolute inset-4 rounded-2xl flex items-center justify-center"
-          style={{ background:"rgba(45,212,191,0.08)" }}>
+          style={{ background: "rgba(45,212,191,0.08)" }}>
           <svg width="52" height="52" viewBox="0 0 52 52" fill="none">
             <circle cx="26" cy="26" r="24" stroke="rgba(45,212,191,0.3)" strokeWidth="1.5" />
             <path d="M14 30l8-8 6 6 10-12" stroke="#2dd4bf" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" opacity="0.7" />
             <circle cx="26" cy="17" r="3" fill="rgba(45,212,191,0.4)" />
             <path d="M20 38h12" stroke="rgba(45,212,191,0.3)" strokeWidth="1.5" strokeLinecap="round" />
-            <path d="M23 41h6"  stroke="rgba(45,212,191,0.2)" strokeWidth="1.5" strokeLinecap="round" />
+            <path d="M23 41h6" stroke="rgba(45,212,191,0.2)" strokeWidth="1.5" strokeLinecap="round" />
           </svg>
         </div>
-        {/* Floating dots */}
-        <div className="absolute -top-2 -right-2 w-4 h-4 rounded-full bg-amber-400/40 blur-sm" style={{ animation:"glowPulse 2s ease-in-out infinite" }} />
-        <div className="absolute -bottom-1 -left-2 w-3 h-3 rounded-full bg-teal-400/30 blur-sm" style={{ animation:"glowPulse 2.6s ease-in-out infinite" }} />
+        <div className="absolute -top-2 -right-2 w-4 h-4 rounded-full bg-amber-400/40 blur-sm" style={{ animation: "glowPulse 2s ease-in-out infinite" }} />
+        <div className="absolute -bottom-1 -left-2 w-3 h-3 rounded-full bg-teal-400/30 blur-sm" style={{ animation: "glowPulse 2.6s ease-in-out infinite" }} />
       </div>
 
       <div className="text-center max-w-xs">
         <p className="text-lg font-bold mb-2"
-          style={{ background:"linear-gradient(90deg,#5eead4,#fbbf24)", WebkitBackgroundClip:"text", WebkitTextFillColor:"transparent" }}>
+          style={{ background: "linear-gradient(90deg,#5eead4,#fbbf24)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>
           Start tracking your finances today
         </p>
         <p className="text-sm text-white/35">
@@ -481,7 +483,7 @@ function EmptyState({ onAddClick }) {
       <button
         onClick={onAddClick}
         className="submit-btn flex items-center gap-2 px-6 py-3 rounded-xl text-sm font-bold text-white"
-        style={{ background:"linear-gradient(135deg,#2dd4bf,#f59e0b)", boxShadow:"0 4px 24px rgba(45,212,191,0.4)" }}
+        style={{ background: "linear-gradient(135deg,#2dd4bf,#f59e0b)", boxShadow: "0 4px 24px rgba(45,212,191,0.4)" }}
       >
         <Plus size={16} /> Add First Transaction
       </button>
@@ -501,24 +503,24 @@ function DetailsModal({ expense, onClose, onEdit, onDelete }) {
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center p-4"
-      style={{ background:"rgba(8,11,20,0.8)", backdropFilter:"blur(14px)" }}
+      style={{ background: "rgba(8,11,20,0.8)", backdropFilter: "blur(14px)" }}
       onClick={(e) => e.target === e.currentTarget && onClose()}
     >
       <div
         className="w-full max-w-md rounded-2xl overflow-hidden shadow-2xl"
         style={{
-          background:"linear-gradient(135deg,rgba(45,212,191,0.1),rgba(245,158,11,0.07))",
-          border:"1px solid rgba(45,212,191,0.3)",
-          backdropFilter:"blur(30px)",
-          animation:"fadeUp .25s ease both",
+          background: "linear-gradient(135deg,rgba(45,212,191,0.1),rgba(245,158,11,0.07))",
+          border: "1px solid rgba(45,212,191,0.3)",
+          backdropFilter: "blur(30px)",
+          animation: "fadeUp .25s ease both",
         }}
       >
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4"
-          style={{ borderBottom:"1px solid rgba(255,255,255,0.07)" }}>
+          style={{ borderBottom: "1px solid rgba(255,255,255,0.07)" }}>
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl flex items-center justify-center text-xl"
-              style={{ background:`${catColor}18`, border:`1px solid ${catColor}28` }}>
+              style={{ background: `${catColor}18`, border: `1px solid ${catColor}28` }}>
               {CATEGORY_EMOJI[expense.category] || "📦"}
             </div>
             <div>
@@ -536,21 +538,21 @@ function DetailsModal({ expense, onClose, onEdit, onDelete }) {
 
         {/* Amount hero */}
         <div className="px-6 py-5 text-center"
-          style={{ borderBottom:"1px solid rgba(255,255,255,0.06)" }}>
+          style={{ borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
           <span className="text-3xl font-black"
             style={{
               background: isIncome
                 ? "linear-gradient(90deg,#4ade80,#86efac)"
                 : "linear-gradient(90deg,#f87171,#fca5a5)",
-              WebkitBackgroundClip:"text", WebkitTextFillColor:"transparent",
+              WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent",
             }}>
             {isIncome ? "+" : "-"}{fmt(expense.amount)}
           </span>
           <div className="mt-2">
             <span className="inline-flex items-center gap-1.5 text-xs font-bold px-3 py-1 rounded-full"
               style={isIncome
-                ? { background:"rgba(74,222,128,0.12)", color:"#4ade80", border:"1px solid rgba(74,222,128,0.25)" }
-                : { background:"rgba(248,113,113,0.12)", color:"#f87171", border:"1px solid rgba(248,113,113,0.25)" }}>
+                ? { background: "rgba(74,222,128,0.12)", color: "#4ade80", border: "1px solid rgba(74,222,128,0.25)" }
+                : { background: "rgba(248,113,113,0.12)", color: "#f87171", border: "1px solid rgba(248,113,113,0.25)" }}>
               {isIncome ? <TrendingUp size={11} /> : <TrendingDown size={11} />}
               {isIncome ? "Income" : "Expense"}
             </span>
@@ -560,13 +562,13 @@ function DetailsModal({ expense, onClose, onEdit, onDelete }) {
         {/* Details grid */}
         <div className="px-6 py-4 grid grid-cols-2 gap-3">
           {[
-            { label:"Payment Method", value:`${PAYMENT_ICONS[expense.paymentMethod] || ""} ${expense.paymentMethod || "—"}` },
-            { label:"Date", value: expense.date ? new Date(expense.date).toLocaleDateString("en-IN", { weekday:"short", day:"numeric", month:"short", year:"numeric" }) : "—" },
-            { label:"Recurring", value: expense.recurring ? "✅ Yes" : "❌ No" },
-            { label:"Category",  value: expense.category || "—" },
+            { label: "Payment Method", value: `${PAYMENT_ICONS[expense.paymentMethod] || ""} ${expense.paymentMethod || "—"}` },
+            { label: "Date", value: expense.date ? new Date(expense.date).toLocaleDateString("en-IN", { weekday: "short", day: "numeric", month: "short", year: "numeric" }) : "—" },
+            { label: "Recurring", value: expense.recurring ? "✅ Yes" : "❌ No" },
+            { label: "Category",  value: expense.category || "—" },
           ].map((row) => (
             <div key={row.label} className="rounded-xl p-3"
-              style={{ background:"rgba(255,255,255,0.035)", border:"1px solid rgba(255,255,255,0.07)" }}>
+              style={{ background: "rgba(255,255,255,0.035)", border: "1px solid rgba(255,255,255,0.07)" }}>
               <p className="text-[10px] font-semibold uppercase tracking-widest text-white/30 mb-1">{row.label}</p>
               <p className="text-sm font-semibold text-white/80">{row.value}</p>
             </div>
@@ -580,7 +582,7 @@ function DetailsModal({ expense, onClose, onEdit, onDelete }) {
             <div className="flex flex-wrap gap-1.5">
               {tags.map((tag, i) => (
                 <span key={i} className="text-xs px-2.5 py-1 rounded-full font-medium"
-                  style={{ background:"rgba(45,212,191,0.12)", color:"#5eead4", border:"1px solid rgba(45,212,191,0.2)" }}>
+                  style={{ background: "rgba(45,212,191,0.12)", color: "#5eead4", border: "1px solid rgba(45,212,191,0.2)" }}>
                   #{tag}
                 </span>
               ))}
@@ -592,12 +594,12 @@ function DetailsModal({ expense, onClose, onEdit, onDelete }) {
         <div className="flex gap-3 px-6 pb-6">
           <button onClick={() => { onClose(); onEdit(expense); }}
             className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold transition-all hover:bg-white/5"
-            style={{ border:"1px solid rgba(255,255,255,0.1)", color:"rgba(255,255,255,0.5)" }}>
+            style={{ border: "1px solid rgba(255,255,255,0.1)", color: "rgba(255,255,255,0.5)" }}>
             <Edit2 size={14} /> Edit
           </button>
           <button onClick={() => { onClose(); onDelete(expense._id); }}
             className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold transition-all"
-            style={{ background:"rgba(239,68,68,0.12)", border:"1px solid rgba(239,68,68,0.25)", color:"#f87171" }}>
+            style={{ background: "rgba(239,68,68,0.12)", border: "1px solid rgba(239,68,68,0.25)", color: "#f87171" }}>
             <X size={14} /> Delete
           </button>
         </div>
@@ -608,23 +610,49 @@ function DetailsModal({ expense, onClose, onEdit, onDelete }) {
 
 /* ══════════════════════════════════════════════════
    EDIT MODAL
+   ✅ FIX: handleDescriptionChange defined here
+   ✅ FIX: AI category prediction works during edit
+   ✅ FIX: Recurring checkbox included
+   ✅ FIX: Saves to MongoDB via PUT /expenses/:id
 ══════════════════════════════════════════════════ */
 function EditModal({ expense, onClose, onSave }) {
   const [form, setForm] = useState({
-    amount:          expense.amount || "",
-    category:        expense.category || "Food",
-    description:     expense.description || "",
-    paymentMethod:   expense.paymentMethod || "Cash",
+    amount:          expense.amount          || "",
+    category:        expense.category        || "Food",
+    description:     expense.description     || "",
+    paymentMethod:   expense.paymentMethod   || "Cash",
     transactionType: expense.transactionType || "expense",
     date:            expense.date ? expense.date.split("T")[0] : todayStr,
     tags:            Array.isArray(expense.tags) ? expense.tags.join(", ") : (expense.tags || ""),
-    recurring:       expense.recurring || false,
+    recurring:       expense.recurring       || false,
   });
-  const [saving, setSaving] = useState(false);
+  const [saving, setSaving]           = useState(false);
+  const [predicting, setPredicting]   = useState(false);
 
+  // ✅ handleChange for all fields except description
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
     setForm((p) => ({ ...p, [name]: type === "checkbox" ? checked : value }));
+  };
+
+  // ✅ handleDescriptionChange with AI category prediction (same as Add form)
+  const handleDescriptionChange = async (e) => {
+    const value = e.target.value;
+    setForm((p) => ({ ...p, description: value }));
+
+    if (value.trim().length > 3) {
+      setPredicting(true);
+      try {
+        const predicted = await predictCategory(value);
+        if (predicted && CATEGORIES.includes(predicted.trim())) {
+          setForm((p) => ({ ...p, category: predicted.trim() }));
+        }
+      } catch {
+        // Keep previous category — do not crash or clear
+      } finally {
+        setPredicting(false);
+      }
+    }
   };
 
   const handleSave = async (e) => {
@@ -634,12 +662,13 @@ function EditModal({ expense, onClose, onSave }) {
       const payload = {
         ...form,
         amount: parseFloat(form.amount),
-        tags:   form.tags ? form.tags.split(",").map((t) => t.trim()) : [],
+        tags:   form.tags ? form.tags.split(",").map((t) => t.trim()).filter(Boolean) : [],
       };
       await api.put(`/expenses/${expense._id}`, payload);
-      onSave();
-    } catch {
-      onSave(true);
+      onSave();          // success — no arg
+    } catch (err) {
+      const msg = err?.response?.data?.message || "Failed to update transaction.";
+      onSave(msg);       // pass error message
     } finally {
       setSaving(false);
     }
@@ -647,23 +676,23 @@ function EditModal({ expense, onClose, onSave }) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
-      style={{ background:"rgba(8,11,20,0.8)", backdropFilter:"blur(12px)" }}
+      style={{ background: "rgba(8,11,20,0.8)", backdropFilter: "blur(12px)" }}
       onClick={(e) => e.target === e.currentTarget && onClose()}>
       <div className="w-full max-w-lg rounded-2xl overflow-hidden shadow-2xl"
         style={{
-          background:"linear-gradient(135deg,rgba(45,212,191,0.1),rgba(245,158,11,0.07))",
-          border:"1px solid rgba(45,212,191,0.3)",
-          backdropFilter:"blur(30px)",
-          animation:"fadeUp .25s ease both",
+          background: "linear-gradient(135deg,rgba(45,212,191,0.1),rgba(245,158,11,0.07))",
+          border: "1px solid rgba(45,212,191,0.3)",
+          backdropFilter: "blur(30px)",
+          animation: "fadeUp .25s ease both",
         }}>
         <div className="flex items-center justify-between px-6 py-4"
-          style={{ borderBottom:"1px solid rgba(255,255,255,0.07)" }}>
+          style={{ borderBottom: "1px solid rgba(255,255,255,0.07)" }}>
           <div className="flex items-center gap-2.5">
             <div className="w-7 h-7 rounded-lg bg-teal-400/20 border border-teal-400/30 flex items-center justify-center">
               <Edit2 size={13} className="text-teal-300" />
             </div>
             <h3 className="text-sm font-bold uppercase tracking-widest"
-              style={{ background:"linear-gradient(90deg,#5eead4,#fbbf24)", WebkitBackgroundClip:"text", WebkitTextFillColor:"transparent" }}>
+              style={{ background: "linear-gradient(90deg,#5eead4,#fbbf24)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>
               Edit Transaction
             </h3>
           </div>
@@ -674,19 +703,41 @@ function EditModal({ expense, onClose, onSave }) {
         </div>
 
         <form onSubmit={handleSave} className="p-6 grid grid-cols-1 sm:grid-cols-2 gap-4">
+          {/* Amount */}
           <div>
             <label className={labelCls}>Amount (₹)</label>
-            <input type="number" name="amount" value={form.amount} onChange={handleChange} required placeholder="0.00" className={inputCls} />
+            <input
+              type="number"
+              name="amount"
+              value={form.amount}
+              onChange={handleChange}
+              required
+              placeholder="0.00"
+              min="0"
+              step="any"
+              className={inputCls}
+            />
           </div>
+
+          {/* Category — auto-updated by AI */}
           <div>
-            <label className={labelCls}>Category</label>
+            <label className={labelCls}>
+              Category
+              {predicting && (
+                <span className="ml-2 text-teal-400/70 text-[10px] font-normal normal-case tracking-normal">
+                  🤖 predicting…
+                </span>
+              )}
+            </label>
             <select name="category" value={form.category} onChange={handleChange} className={selectCls}>
-              {CATEGORIES.map((c) => <option key={c}>{c}</option>)}
+              {CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
             </select>
           </div>
+
+          {/* Description — triggers AI prediction */}
           <div className="sm:col-span-2">
             <label className={labelCls}>Description</label>
-                        <input
+            <input
               name="description"
               value={form.description}
               onChange={handleDescriptionChange}
@@ -694,16 +745,24 @@ function EditModal({ expense, onClose, onSave }) {
               className={inputCls}
             />
           </div>
+
+          {/* Payment Method */}
           <div>
             <label className={labelCls}>Payment Method</label>
             <select name="paymentMethod" value={form.paymentMethod} onChange={handleChange} className={selectCls}>
-              {PAYMENT_METHODS.map((m) => <option key={m}>{PAYMENT_ICONS[m]} {m}</option>)}
+              {PAYMENT_METHODS.map((m) => (
+                <option key={m} value={m}>{PAYMENT_ICONS[m]} {m}</option>
+              ))}
             </select>
           </div>
+
+          {/* Date */}
           <div>
             <label className={labelCls}>Date</label>
             <input type="date" name="date" value={form.date} onChange={handleChange} className={inputCls} />
           </div>
+
+          {/* Transaction Type */}
           <div>
             <label className={labelCls}>Type</label>
             <select name="transactionType" value={form.transactionType} onChange={handleChange} className={selectCls}>
@@ -711,19 +770,39 @@ function EditModal({ expense, onClose, onSave }) {
               <option value="income">Income</option>
             </select>
           </div>
+
+          {/* Tags */}
           <div>
             <label className={labelCls}>Tags (comma separated)</label>
             <input name="tags" value={form.tags} onChange={handleChange} placeholder="food, dining..." className={inputCls} />
           </div>
-          <div className="sm:col-span-2 flex gap-3 pt-2">
+
+          {/* ✅ Recurring checkbox — was missing in original */}
+          <div className="sm:col-span-2 flex items-center gap-3 py-1">
+            <label className="flex items-center gap-2.5 cursor-pointer select-none">
+              <input
+                type="checkbox"
+                name="recurring"
+                checked={form.recurring}
+                onChange={handleChange}
+                className="w-4 h-4 rounded accent-teal-400"
+              />
+              <span className="text-[12px] font-semibold text-white/60">
+                🔁 Mark as recurring
+              </span>
+            </label>
+          </div>
+
+          {/* Actions */}
+          <div className="sm:col-span-2 flex gap-3 pt-1">
             <button type="button" onClick={onClose}
               className="flex-1 py-2.5 rounded-xl text-sm font-semibold text-white/50 border border-white/10 hover:bg-white/5 transition-all">
               Cancel
             </button>
             <button type="submit" disabled={saving}
               className="flex-1 py-2.5 rounded-xl text-sm font-bold text-white disabled:opacity-60"
-              style={{ background:"linear-gradient(135deg,#2dd4bf,#f59e0b)", boxShadow:"0 4px 20px rgba(45,212,191,0.35)" }}>
-              {saving ? "Saving..." : "Save Changes"}
+              style={{ background: "linear-gradient(135deg,#2dd4bf,#f59e0b)", boxShadow: "0 4px 20px rgba(45,212,191,0.35)" }}>
+              {saving ? "Saving…" : "Save Changes"}
             </button>
           </div>
         </form>
@@ -736,66 +815,22 @@ function EditModal({ expense, onClose, onSave }) {
    MAIN PAGE
 ══════════════════════════════════════════════════ */
 export default function Expenses() {
-  const [expenses,    setExpenses]    = useState([]);
-  const [loading,     setLoading]     = useState(true);
-  const [submitting,  setSubmitting]  = useState(false);
-  const [form,        setForm]        = useState(emptyForm);
-  const [editTarget,  setEditTarget]  = useState(null);
-  const [viewTarget,  setViewTarget]  = useState(null);
-  const [sortBy,      setSortBy]      = useState("latest");
-  const [showForm,    setShowForm]    = useState(false);
+  const [expenses,   setExpenses]   = useState([]);
+  const [loading,    setLoading]    = useState(true);
+  const [submitting, setSubmitting] = useState(false);
+  const [form,       setForm]       = useState(emptyForm);
+  const [editTarget, setEditTarget] = useState(null);
+  const [viewTarget, setViewTarget] = useState(null);
+  const [sortBy,     setSortBy]     = useState("latest");
+  const [showForm,   setShowForm]   = useState(false);
   const [filters, setFilters] = useState({
-    category:"", transactionType:"", month:"",
-    search:"", startDate:"", endDate:"",
+    category: "", transactionType: "", month: "",
+    search: "", startDate: "", endDate: "",
   });
   const [error, setError] = useState("");
   const { toasts, push }  = useToast();
 
-
-const predictCategory = async (text) => {
-
-  try {
-
-    // const response = await fetch(
-    //   "http://localhost:8000/predict",
-
-     const response = await fetch(
-      `${import.meta.env.VITE_ML_URL}/predict`,
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          text,
-        }),
-      }
-    );
-
-    const data = await response.json();
-
-    return data.category;
-
-  } catch (err) {
-
-    console.log("Prediction Error:", err);
-
-    return "";
-  }
-};
-
-
-  
-
-
-
-
-
-
-
-
-
-  /* ── API calls (unchanged) ── */
+  /* ── Fetch ── */
   const fetchExpenses = useCallback(async () => {
     setLoading(true);
     try {
@@ -815,38 +850,27 @@ const predictCategory = async (text) => {
 
   useEffect(() => { fetchExpenses(); }, [fetchExpenses]);
 
+  /* ── Add form handlers ── */
   const handleChange = (e) => {
-  const { name, value, type, checked } = e.target;
+    const { name, value, type, checked } = e.target;
+    setForm((p) => ({ ...p, [name]: type === "checkbox" ? checked : value }));
+  };
 
-  setForm((prev) => ({
-    ...prev,
-    [name]: type === "checkbox" ? checked : value,
-  }));
-};
-
-const handleDescriptionChange = async (e) => {
-
-  const value = e.target.value;
-
-  setForm((prev) => ({
-    ...prev,
-    description: value,
-  }));
-
-  if (value.trim().length > 3) {
-
-    const predicted = await predictCategory(value);
-
-    if (predicted) {
-
-      setForm((prev) => ({
-        ...prev,
-        category: predicted.trim(),
-      }));
-
+  // ✅ AI prediction for Add form
+  const handleDescriptionChange = async (e) => {
+    const value = e.target.value;
+    setForm((p) => ({ ...p, description: value }));
+    if (value.trim().length > 3) {
+      try {
+        const predicted = await predictCategory(value);
+        if (predicted && CATEGORIES.includes(predicted.trim())) {
+          setForm((p) => ({ ...p, category: predicted.trim() }));
+        }
+      } catch {
+        // Keep previous category — do not crash
+      }
     }
-  }
-};
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -856,7 +880,7 @@ const handleDescriptionChange = async (e) => {
       const payload = {
         ...form,
         amount: parseFloat(form.amount),
-        tags:   form.tags ? form.tags.split(",").map((t) => t.trim()) : [],
+        tags:   form.tags ? form.tags.split(",").map((t) => t.trim()).filter(Boolean) : [],
       };
       await api.post("/expenses", payload);
       setForm(emptyForm);
@@ -864,7 +888,7 @@ const handleDescriptionChange = async (e) => {
       fetchExpenses();
       push("Transaction added successfully!", "success");
     } catch (err) {
-      const msg = err.response?.data?.message || "Failed to add expense.";
+      const msg = err?.response?.data?.message || "Failed to add expense.";
       setError(msg);
       push(msg, "error");
     } finally {
@@ -885,10 +909,11 @@ const handleDescriptionChange = async (e) => {
 
   const handleEdit = (expense) => setEditTarget(expense);
 
-  const handleEditSave = async (hasError) => {
+  // ✅ FIX: onSave receives either nothing (success) or an error message string
+  const handleEditSave = async (errorMsg) => {
     setEditTarget(null);
-    if (hasError) {
-      push("Failed to update transaction.", "error");
+    if (errorMsg) {
+      push(typeof errorMsg === "string" ? errorMsg : "Failed to update transaction.", "error");
     } else {
       await fetchExpenses();
       push("Transaction updated!", "success");
@@ -897,72 +922,23 @@ const handleDescriptionChange = async (e) => {
 
   /* ── Client-side filter + sort ── */
   const processed = expenses
-  .filter((e) => {
-
-    if (
-      filters.search &&
-      !e.description?.toLowerCase().includes(filters.search.toLowerCase()) &&
-      !e.category?.toLowerCase().includes(filters.search.toLowerCase())
-    ) {
-      return false;
-    }
-
-    if (
-      filters.startDate &&
-      new Date(e.date) < new Date(filters.startDate)
-    ) {
-      return false;
-    }
-
-    if (
-      filters.endDate &&
-      new Date(e.date) > new Date(filters.endDate)
-    ) {
-      return false;
-    }
-
-    return true;
-  })
-
-  .sort((a, b) => {
-
-    // 🔥 Latest First
-    if (sortBy === "latest") {
-
-      return (
-        new Date(b.createdAt || b.date).getTime() -
-        new Date(a.createdAt || a.date).getTime()
-      );
-
-    }
-
-    // 🔥 Oldest First
-    if (sortBy === "oldest") {
-
-      return (
-        new Date(a.createdAt || a.date).getTime() -
-        new Date(b.createdAt || b.date).getTime()
-      );
-
-    }
-
-    // 💰 Highest Amount
-    if (sortBy === "highest") {
-
-      return b.amount - a.amount;
-
-    }
-
-    // 💸 Lowest Amount
-    if (sortBy === "lowest") {
-
-      return a.amount - b.amount;
-
-    }
-
-    return 0;
-
-  });
+    .filter((e) => {
+      if (
+        filters.search &&
+        !e.description?.toLowerCase().includes(filters.search.toLowerCase()) &&
+        !e.category?.toLowerCase().includes(filters.search.toLowerCase())
+      ) return false;
+      if (filters.startDate && new Date(e.date) < new Date(filters.startDate)) return false;
+      if (filters.endDate   && new Date(e.date) > new Date(filters.endDate))   return false;
+      return true;
+    })
+    .sort((a, b) => {
+      if (sortBy === "latest")  return new Date(b.createdAt || b.date).getTime() - new Date(a.createdAt || a.date).getTime();
+      if (sortBy === "oldest")  return new Date(a.createdAt || a.date).getTime() - new Date(b.createdAt || b.date).getTime();
+      if (sortBy === "highest") return b.amount - a.amount;
+      if (sortBy === "lowest")  return a.amount - b.amount;
+      return 0;
+    });
 
   const grouped = groupByDate(processed);
 
@@ -970,84 +946,40 @@ const handleDescriptionChange = async (e) => {
     filters.category, filters.transactionType, filters.startDate, filters.endDate,
   ].filter(Boolean).length;
 
-
-
-
-
-
-
-  //ne wadd
-
-
-  const handleExportPDF = useCallback(() => {
-  if (!transactions || transactions.length === 0) {
-    push("No transactions to export!", "error"); // Uses your hook toast
-    return;
-  }
-
-  try {
+  /* ── ✅ Export PDF: uses `processed` (filtered + sorted real transactions) ── */
+  const handleExportPDF = () => {
     const doc = new jsPDF();
-    
-    // 1. Add PDF Document Title & Metadata
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(20);
-    doc.setTextColor(8, 11, 20); // Your page dark color #080B14
-    doc.text("Expense Tracker - Financial Report", 14, 20);
-    
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(10);
-    doc.setTextColor(100, 116, 139); // Slate muted color
-    doc.text(`Generated on: ${new Date().toLocaleDateString("en-IN")}`, 14, 27);
 
-    // 2. Map data specifically matching your state structure
-    const tableRows = transactions.map((t) => [
-      t.date ? new Date(t.date).toLocaleDateString("en-IN") : "—",
-      t.description || t.category,
-      t.category,
-      t.paymentMethod,
-      t.transactionType === "income" ? "Income" : "Expense",
-      `${t.transactionType === "income" ? "+" : "-"} Rs. ${Number(t.amount || 0).toLocaleString("en-IN")}`
-    ]);
+    doc.setFontSize(18);
+    doc.text("Transactions Report", 14, 18);
 
-    // 3. Generate Table using autoTable
+    doc.setFontSize(11);
+    doc.text(`Generated: ${new Date().toLocaleString("en-IN")}`, 14, 26);
+
     autoTable(doc, {
-      startY: 35,
-      head: [["Date", "Description", "Category", "Payment Method", "Type", "Amount"]],
-      body: tableRows,
-      theme: "striped",
-      headStyles: {
-        fillColor: [45, 212, 191], // Matches your teal #2dd4bf brand accent
-        textColor: [255, 255, 255],
-        fontStyle: "bold"
-      },
-      alternateRowStyles: {
-        fillColor: [248, 250, 252]
-      },
-      styles: {
-        font: "helvetica",
-        fontSize: 9,
-        cellPadding: 4
-      },
-      columnStyles: {
-        5: { halign: "right", fontStyle: "bold" } // Align amount column nicely
-      }
+      startY: 34,
+      head: [["Date", "Description", "Category", "Type", "Payment", "Amount"]],
+      body: processed.map((item) => [
+        item.date ? new Date(item.date).toLocaleDateString("en-IN") : "-",
+        item.description || "-",
+        item.category    || "-",
+        item.transactionType || "-",
+        item.paymentMethod   || "-",
+        `₹${Number(item.amount).toLocaleString("en-IN")}`,
+      ]),
+      styles:            { fontSize: 10, cellPadding: 3 },
+      headStyles:        { fillColor: [45, 212, 191], textColor: 255, fontStyle: "bold" },
+      alternateRowStyles:{ fillColor: [245, 245, 245] },
     });
 
-    // 4. Trigger download
-    doc.save(`Financial_Report_${new Date().toISOString().split('T')[0]}.pdf`);
-    push("Report downloaded successfully!", "success");
-
-  } catch (error) {
-    console.error("PDF generation failed:", error);
-    push("Failed to generate PDF.", "error");
-  }
-}, [transactions, push]);
+    doc.save("Transactions_Report.pdf");
+  };
 
   /* ══════════════════════════════════
      RENDER
   ══════════════════════════════════ */
   return (
-    <div className="relative p-4 sm:p-6 space-y-6 min-h-screen" style={{ background:PAGE_BG }}>
+    <div className="relative p-4 sm:p-6 space-y-6 min-h-screen" style={{ background: PAGE_BG }}>
       <style>{`
         @keyframes shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
         @keyframes fadeUp{from{opacity:0;transform:translateY(18px)}to{opacity:1;transform:translateY(0)}}
@@ -1089,8 +1021,21 @@ const handleDescriptionChange = async (e) => {
       `}</style>
 
       <ToastContainer toasts={toasts} />
-      {editTarget  && <EditModal   expense={editTarget}  onClose={() => setEditTarget(null)}  onSave={handleEditSave} />}
-      {viewTarget  && <DetailsModal expense={viewTarget} onClose={() => setViewTarget(null)}  onEdit={handleEdit} onDelete={handleDelete} />}
+      {editTarget && (
+        <EditModal
+          expense={editTarget}
+          onClose={() => setEditTarget(null)}
+          onSave={handleEditSave}
+        />
+      )}
+      {viewTarget && (
+        <DetailsModal
+          expense={viewTarget}
+          onClose={() => setViewTarget(null)}
+          onEdit={handleEdit}
+          onDelete={handleDelete}
+        />
+      )}
 
       {/* Orbs */}
       <div className="pointer-events-none absolute inset-0 overflow-hidden">
@@ -1102,34 +1047,34 @@ const handleDescriptionChange = async (e) => {
       {/* ── PAGE HEADER ── */}
       <div className="relative flex items-center gap-3 fadein-0">
         <div className="w-1 h-7 rounded-full bg-gradient-to-b from-teal-300 to-amber-400"
-          style={{ boxShadow:"0 0 12px rgba(45,212,191,0.6)" }} />
+          style={{ boxShadow: "0 0 12px rgba(45,212,191,0.6)" }} />
         <h2 className="text-2xl font-bold tracking-tight"
-          style={{ background:"linear-gradient(90deg,#5eead4,#fbbf24)", WebkitBackgroundClip:"text", WebkitTextFillColor:"transparent" }}>
+          style={{ background: "linear-gradient(90deg,#5eead4,#fbbf24)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>
           Transactions
         </h2>
         <span className="glow-dot w-2 h-2 rounded-full bg-teal-300"
-          style={{ boxShadow:"0 0 8px rgba(45,212,191,0.8)" }} />
+          style={{ boxShadow: "0 0 8px rgba(45,212,191,0.8)" }} />
 
         <div className="ml-auto flex items-center gap-2">
           {expenses.length > 0 && (
             <span className="text-xs font-bold px-2.5 py-1 rounded-full"
-              style={{ background:"rgba(45,212,191,0.15)", border:"1px solid rgba(45,212,191,0.3)", color:"#5eead4" }}>
+              style={{ background: "rgba(45,212,191,0.15)", border: "1px solid rgba(45,212,191,0.3)", color: "#5eead4" }}>
               {expenses.length} records
             </span>
           )}
-          {/* Export button — UI only */}
+          {/* ✅ Export PDF — exports processed (filtered + sorted) transactions */}
           <button
-  onClick={handleExportPDF}
-  className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white/[0.07] border border-white/[0.12] text-white/80 text-sm font-semibold hover:bg-white/[0.12] transition-all duration-200"
-  title="Export as PDF"
->
-  <Download size={16} /> Export PDF
-</button>
-          {/* Add button (toggles form) */}
+            onClick={handleExportPDF}
+            className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white/[0.07] border border-white/[0.12] text-white/80 text-sm font-semibold hover:bg-white/[0.12] transition-all duration-200"
+            title="Export as PDF"
+          >
+            <Download size={16} /> Export PDF
+          </button>
+          {/* Add button */}
           <button
             onClick={() => setShowForm((p) => !p)}
             className="submit-btn flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold text-white"
-            style={{ background:"linear-gradient(135deg,#2dd4bf,#f59e0b)", boxShadow:"0 3px 16px rgba(45,212,191,0.35)" }}>
+            style={{ background: "linear-gradient(135deg,#2dd4bf,#f59e0b)", boxShadow: "0 3px 16px rgba(45,212,191,0.35)" }}>
             <Plus size={13} /> {showForm ? "Close" : "Add"}
           </button>
         </div>
@@ -1152,20 +1097,20 @@ const handleDescriptionChange = async (e) => {
                 <Plus size={14} className="text-teal-300" />
               </div>
               <h3 className="text-sm font-bold uppercase tracking-widest"
-                style={{ background:"linear-gradient(90deg,#5eead4,#fbbf24)", WebkitBackgroundClip:"text", WebkitTextFillColor:"transparent" }}>
+                style={{ background: "linear-gradient(90deg,#5eead4,#fbbf24)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>
                 Add Transaction
               </h3>
             </div>
 
             {/* Type toggle */}
             <div className="flex gap-2 mb-5">
-              {["expense","income"].map((t) => (
+              {["expense", "income"].map((t) => (
                 <button key={t} type="button"
-                  onClick={() => setForm((p) => ({ ...p, transactionType:t }))}
+                  onClick={() => setForm((p) => ({ ...p, transactionType: t }))}
                   className="type-btn px-4 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wide border"
                   style={form.transactionType === t
-                    ? { background: t === "expense" ? "linear-gradient(135deg,#ef4444,#f87171)" : "linear-gradient(135deg,#22c55e,#4ade80)", color:"#fff", borderColor:"transparent", boxShadow:`0 0 14px ${t === "expense" ? "rgba(239,68,68,0.4)" : "rgba(34,197,94,0.4)"}` }
-                    : { background:"transparent", color:"rgba(255,255,255,0.35)", borderColor:"rgba(255,255,255,0.1)" }
+                    ? { background: t === "expense" ? "linear-gradient(135deg,#ef4444,#f87171)" : "linear-gradient(135deg,#22c55e,#4ade80)", color: "#fff", borderColor: "transparent", boxShadow: `0 0 14px ${t === "expense" ? "rgba(239,68,68,0.4)" : "rgba(34,197,94,0.4)"}` }
+                    : { background: "transparent", color: "rgba(255,255,255,0.35)", borderColor: "rgba(255,255,255,0.1)" }
                   }>
                   {t === "expense" ? "💸 Expense" : "💰 Income"}
                 </button>
@@ -1176,12 +1121,12 @@ const handleDescriptionChange = async (e) => {
               <div>
                 <label className={labelCls}>Amount (₹)</label>
                 <input type="number" name="amount" value={form.amount} onChange={handleChange}
-                  placeholder="0.00" required className={inputCls} />
+                  placeholder="0.00" required min="0" step="any" className={inputCls} />
               </div>
               <div>
                 <label className={labelCls}>Category</label>
                 <select name="category" value={form.category} onChange={handleChange} className={selectCls}>
-                  {CATEGORIES.map((c) => <option key={c}>{CATEGORY_EMOJI[c]} {c}</option>)}
+                  {CATEGORIES.map((c) => <option key={c} value={c}>{CATEGORY_EMOJI[c]} {c}</option>)}
                 </select>
               </div>
               <div>
@@ -1192,7 +1137,7 @@ const handleDescriptionChange = async (e) => {
               <div>
                 <label className={labelCls}>Payment Method</label>
                 <select name="paymentMethod" value={form.paymentMethod} onChange={handleChange} className={selectCls}>
-                  {PAYMENT_METHODS.map((m) => <option key={m}>{PAYMENT_ICONS[m]} {m}</option>)}
+                  {PAYMENT_METHODS.map((m) => <option key={m} value={m}>{PAYMENT_ICONS[m]} {m}</option>)}
                 </select>
               </div>
               <div>
@@ -1207,14 +1152,14 @@ const handleDescriptionChange = async (e) => {
               <div className="sm:col-span-2 lg:col-span-3 flex justify-end">
                 <button type="submit" disabled={submitting}
                   className="submit-btn px-8 py-2.5 rounded-xl text-sm font-bold text-white tracking-wide disabled:opacity-60 disabled:cursor-not-allowed flex items-center gap-2"
-                  style={{ background:"linear-gradient(135deg,#2dd4bf,#f59e0b)", boxShadow:"0 4px 20px rgba(45,212,191,0.35)" }}>
+                  style={{ background: "linear-gradient(135deg,#2dd4bf,#f59e0b)", boxShadow: "0 4px 20px rgba(45,212,191,0.35)" }}>
                   {submitting ? (
                     <>
                       <svg className="loading-ring w-4 h-4" viewBox="0 0 24 24" fill="none">
                         <circle cx="12" cy="12" r="10" stroke="rgba(255,255,255,0.3)" strokeWidth="3" />
                         <path d="M12 2a10 10 0 0 1 10 10" stroke="white" strokeWidth="3" strokeLinecap="round" />
                       </svg>
-                      Adding...
+                      Adding…
                     </>
                   ) : (<><Plus size={15} /> Add Transaction</>)}
                 </button>
@@ -1255,7 +1200,7 @@ const handleDescriptionChange = async (e) => {
                 <input
                   placeholder="Search transactions..."
                   value={filters.search}
-                  onChange={(e) => setFilters((p) => ({ ...p, search:e.target.value }))}
+                  onChange={(e) => setFilters((p) => ({ ...p, search: e.target.value }))}
                   className="w-full pl-9 pr-4 py-2.5 rounded-xl bg-white/[0.07] border border-white/[0.12] text-white/90 placeholder-white/30 text-sm focus:outline-none focus:border-teal-400/60 transition-all"
                 />
               </div>
@@ -1264,15 +1209,15 @@ const handleDescriptionChange = async (e) => {
                   <Filter size={12} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/30 pointer-events-none" />
                   <select
                     value={filters.category}
-                    onChange={(e) => setFilters((p) => ({ ...p, category:e.target.value }))}
+                    onChange={(e) => setFilters((p) => ({ ...p, category: e.target.value }))}
                     className="pl-8 pr-3 py-2.5 rounded-xl bg-slate-900/80 border border-white/[0.12] text-white/70 text-sm focus:outline-none focus:border-teal-400/60 transition-all">
                     <option value="">All Categories</option>
-                    {CATEGORIES.map((c) => <option key={c}>{c}</option>)}
+                    {CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
                   </select>
                 </div>
                 <select
                   value={filters.transactionType}
-                  onChange={(e) => setFilters((p) => ({ ...p, transactionType:e.target.value }))}
+                  onChange={(e) => setFilters((p) => ({ ...p, transactionType: e.target.value }))}
                   className="px-3 py-2.5 rounded-xl bg-slate-900/80 border border-white/[0.12] text-white/70 text-sm focus:outline-none focus:border-teal-400/60 transition-all">
                   <option value="">All Types</option>
                   <option value="expense">Expense</option>
@@ -1286,14 +1231,14 @@ const handleDescriptionChange = async (e) => {
               <div className="flex items-center gap-2 flex-wrap">
                 <Calendar size={13} className="text-white/30 shrink-0" />
                 <input type="date" value={filters.startDate}
-                  onChange={(e) => setFilters((p) => ({ ...p, startDate:e.target.value }))}
+                  onChange={(e) => setFilters((p) => ({ ...p, startDate: e.target.value }))}
                   className="px-3 py-2 rounded-xl bg-white/[0.07] border border-white/[0.12] text-white/70 text-sm focus:outline-none focus:border-teal-400/60 transition-all" />
                 <span className="text-white/25 text-xs">to</span>
                 <input type="date" value={filters.endDate}
-                  onChange={(e) => setFilters((p) => ({ ...p, endDate:e.target.value }))}
+                  onChange={(e) => setFilters((p) => ({ ...p, endDate: e.target.value }))}
                   className="px-3 py-2 rounded-xl bg-white/[0.07] border border-white/[0.12] text-white/70 text-sm focus:outline-none focus:border-teal-400/60 transition-all" />
                 {(filters.startDate || filters.endDate) && (
-                  <button onClick={() => setFilters((p) => ({ ...p, startDate:"", endDate:"" }))}
+                  <button onClick={() => setFilters((p) => ({ ...p, startDate: "", endDate: "" }))}
                     className="text-white/30 hover:text-white/70 transition-colors">
                     <X size={14} />
                   </button>
@@ -1306,8 +1251,8 @@ const handleDescriptionChange = async (e) => {
                   <button key={s.value} onClick={() => setSortBy(s.value)}
                     className="sort-chip px-2.5 py-1 rounded-lg text-[11px] font-semibold border"
                     style={sortBy === s.value
-                      ? { background:"rgba(45,212,191,0.2)", border:"1px solid rgba(45,212,191,0.4)", color:"#5eead4" }
-                      : { background:"transparent", border:"1px solid rgba(255,255,255,0.08)", color:"rgba(255,255,255,0.35)" }}>
+                      ? { background: "rgba(45,212,191,0.2)", border: "1px solid rgba(45,212,191,0.4)", color: "#5eead4" }
+                      : { background: "transparent", border: "1px solid rgba(255,255,255,0.08)", color: "rgba(255,255,255,0.35)" }}>
                     {s.label}
                   </button>
                 ))}
@@ -1320,20 +1265,20 @@ const handleDescriptionChange = async (e) => {
                 <span className="text-[11px] text-white/30">Active:</span>
                 {filters.category && (
                   <span className="flex items-center gap-1 text-[11px] font-semibold px-2.5 py-1 rounded-full"
-                    style={{ background:"rgba(45,212,191,0.15)", color:"#5eead4" }}>
+                    style={{ background: "rgba(45,212,191,0.15)", color: "#5eead4" }}>
                     {filters.category}
-                    <button onClick={() => setFilters((p) => ({ ...p, category:"" }))}><X size={10} /></button>
+                    <button onClick={() => setFilters((p) => ({ ...p, category: "" }))}><X size={10} /></button>
                   </span>
                 )}
                 {filters.transactionType && (
                   <span className="flex items-center gap-1 text-[11px] font-semibold px-2.5 py-1 rounded-full"
-                    style={{ background:"rgba(45,212,191,0.15)", color:"#5eead4" }}>
+                    style={{ background: "rgba(45,212,191,0.15)", color: "#5eead4" }}>
                     {filters.transactionType}
-                    <button onClick={() => setFilters((p) => ({ ...p, transactionType:"" }))}><X size={10} /></button>
+                    <button onClick={() => setFilters((p) => ({ ...p, transactionType: "" }))}><X size={10} /></button>
                   </span>
                 )}
                 <button
-                  onClick={() => setFilters((p) => ({ ...p, category:"", transactionType:"", startDate:"", endDate:"" }))}
+                  onClick={() => setFilters((p) => ({ ...p, category: "", transactionType: "", startDate: "", endDate: "" }))}
                   className="text-[11px] text-white/30 hover:text-white/60 underline transition-colors">
                   Clear all
                 </button>
@@ -1343,9 +1288,9 @@ const handleDescriptionChange = async (e) => {
 
           {/* Section label */}
           <div className="flex items-center gap-2 mb-4">
-            <span className="w-2 h-2 rounded-full bg-teal-300 glow-dot" style={{ boxShadow:"0 0 6px #2dd4bf" }} />
+            <span className="w-2 h-2 rounded-full bg-teal-300 glow-dot" style={{ boxShadow: "0 0 6px #2dd4bf" }} />
             <h3 className="text-[11px] font-bold uppercase tracking-widest"
-              style={{ color:"rgba(255,255,255,0.45)" }}>
+              style={{ color: "rgba(255,255,255,0.45)" }}>
               Transaction History
             </h3>
             {!loading && processed.length > 0 && (
